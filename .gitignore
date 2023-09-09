@@ -1,0 +1,8 @@
+.vscode
+poetry.lock
+__pycache__/
+*.py[cod]
+dist/
+.mypy_cache/
+*.out
+*.ll
