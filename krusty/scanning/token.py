@@ -27,14 +27,22 @@ class Token:
         # Attributes
         self.type : TokenType = _type
         self.value : int = _value
+        self.registerOfPtr : int = None # used for llvm generation
+        self.registerLoadedIn : int = None # used for llvm generation
     
     def is_terminal(self) -> bool:
         if (self.type == TokenType.INTEGER_LITERAL or 
             self.type == TokenType.EOF):
             return True
         return False
+
+    def is_operator(self) -> bool:
+        if (self.type == TokenType.PLUS or self.type == TokenType.MINUS or
+            self.type == TokenType.STAR or self.type == TokenType.SLASH):
+            return True
+        return False
     
-    def matches_types(self, matches : list) -> bool:
+    def matches_types(self, matches : list[TokenType]) -> bool:
         for tokenType in matches:
             if tokenType == self.type:
                 return True

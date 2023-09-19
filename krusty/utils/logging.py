@@ -15,7 +15,7 @@ def setup_tracebacks() -> None:
     from ..krusty import DEBUG
 
     if DEBUG:
-        sys.tracebacklimit = 0
+        sys.tracebacklimit = 10
 
 
 class KrustyFatalException(Exception):
@@ -59,9 +59,14 @@ class KrustyFileNotFound(KrustyFatalException):
         """
         super().__init__("FILE ERROR", f'File "{filename}" not found')
 
+class KrustyFileError(KrustyFatalException):
+    return_code = 3
+
+    def __init__(self, message : str):
+        super().__init__("FILE ERROR", message)
 
 class KrustySyntaxError(KrustyFatalException):
-    return_code = 3
+    return_code = 4
 
     def __init__(self, message: str):
         """An exception to be thrown when a syntax error is encountered
