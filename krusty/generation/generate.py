@@ -3,32 +3,32 @@ from ..utils import KrustyFileError
 from ..scanning import Token, TokenType
 from ..krusty import ARGS
 from ..krusty_ast import ASTNode
+from ..parsing import Parser
 
 class Generator:
-    def __init__(self, filename : str, ast : ASTNode):
+    def __init__(self, filename : str):
         # Attributes
         self.LLVM_FILE : TextIO
-        self.AST : ASTNode = ast
         self.registerCount = 0
 
         try:
             self.LLVM_FILE = open(filename, "w")
         except Exception as e:
             raise KrustyFileError(str(e))
+
+        self.LLVM_FILE.write(self._llvm_preamble())
     
     def close(self):
+        self.LLVM_FILE.write(self._llvm_postamble())
         self.LLVM_FILE.close()
 
-    def generate_llvm(self):
-        self.LLVM_FILE.write(self._llvm_preamble())
-        self.LLVM_FILE.write(self._llvm_alloca_and_store())
+    def generate_llvm(self, parser : Parser):
+        for ast in parser.parse_statements():
+            self.LLVM_FILE.write("\n\t; ----- NEW STATEMENT -----\n\n")
+            self.LLVM_FILE.write(self._llvm_from_ast(ast))
 
-        self.LLVM_FILE.write(self._llvm_from_ast())
-
-        self.LLVM_FILE.write(self._llvm_postamble())
-                
-    def _llvm_from_ast(self) -> str:
-        llvm_code : str = ""
+    def _llvm_from_ast(self, astRoot : ASTNode) -> str:
+        llvm_code : str = self._llvm_alloca_and_store(astRoot)
         def postorder(ast : ASTNode):
             nonlocal llvm_code, self
 
@@ -59,10 +59,13 @@ class Generator:
                 else:
                     raise TypeError(f"An operator of unknown type was encountered when generating LLVM from AST: {ast.token}")
                 operator.registerLoadedIn = self._increment_register_count()
-                llvm_code += f"\t%{operator.registerLoadedIn} = {operatorCmd} {self._get_llvm_type(leftVal)} {leftVal.token.registerLoadedIn}, {rightVal.token.registerLoadedIn}\n"
-        
-        postorder(self.AST)
-        llvm_code += f"\tcall i32 (i8*, ...) @printf(i8* getelementptr inbounds ([4 x i8], [4 x i8]* @print_int_fstring , i32 0, i32 0), i32 %{self.registerCount-1})\n"
+                llvm_code += f"\t%{operator.registerLoadedIn} = {operatorCmd} {self._get_llvm_type(leftVal)} %{leftVal.token.registerLoadedIn}, %{rightVal.token.registerLoadedIn}\n"
+            elif ast.token.matches_types([TokenType.PRINT]):
+                printToken : Token = ast.token
+                printToken.registerLoadedIn = self._increment_register_count()
+                llvm_code += f"\t%{printToken.registerLoadedIn} = call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([4 x i8], [4 x i8]* @print_int_fstring , i32 0, i32 0), i32 %{ast.left.token.registerLoadedIn})\n"
+
+        postorder(astRoot)
         return llvm_code
 
     def _increment_register_count(self) -> int:
@@ -96,7 +99,7 @@ target triple = "x86_64-pc-linux-gnu"
 define dso_local i32 @main() #0 {{
 """
 
-    def _llvm_alloca_and_store(self) -> str:
+    def _llvm_alloca_and_store(self, astRoot : ASTNode) -> str:
         llvm_code : str = ""
 
         def postorder(astNode : ASTNode):
@@ -107,12 +110,13 @@ define dso_local i32 @main() #0 {{
             if astNode.right:
                 postorder(astNode.right)
             token : Token = astNode.token
-            nextRegNum = self._increment_register_count()
-            token.registerOfPtr = nextRegNum
-            llvm_code += f"\t%{nextRegNum} = alloca {self._get_llvm_type(astNode)}, align 4\n"
-            llvm_code += f"\tstore {self._get_llvm_type(astNode)} {token.value}, {self._get_llvm_type(astNode)}* %{nextRegNum}, align 4\n"
+            if token.is_literal():
+                nextRegNum = self._increment_register_count()
+                token.registerOfPtr = nextRegNum
+                llvm_code += f"\t%{nextRegNum} = alloca {self._get_llvm_type(astNode)}, align 4\n"
+                llvm_code += f"\tstore {self._get_llvm_type(astNode)} {token.value}, {self._get_llvm_type(astNode)}* %{nextRegNum}, align 4\n"
         
-        postorder(self.AST)
+        postorder(astRoot)
         return llvm_code
 
     def _llvm_load_into_register(self, astNodeToLoad : ASTNode) -> str:

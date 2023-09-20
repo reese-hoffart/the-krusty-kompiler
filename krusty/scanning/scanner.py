@@ -2,9 +2,11 @@ from typing import TextIO, List
 import os
 
 from .token import Token, TokenType
-from ..utils.logging import KrustyFileNotFound, KrustySyntaxError
+from ..utils.logging import KrustyFileNotFound, KrustySyntaxError, KrustyIdentifierError
 
 class Scanner:
+    MAX_TOKEN_LENGTH : int = 512
+
     def __init__(self, filename):
         # Attributes
         self.filename = filename
@@ -57,25 +59,40 @@ class Scanner:
         
         return int(intAsString)
     
+    def _scan_identifier(self, currentChar : str) -> str:
+        identifier : str = ""
+
+        while currentChar.isalnum() or currentChar == "_":
+            identifier += currentChar
+            currentChar = self._next_character()
+            
+            if len(identifier) > self.MAX_TOKEN_LENGTH:
+                raise KrustyIdentifierError(f"Identifier exceeded limit of {self.MAX_TOKEN_LENGTH} characters.")
+        
+        self._put_back(currentChar)
+        return identifier
+    
     def scan_next(self) -> Token:
         currentChar : str = self._next_character_skip_whitespace()
 
-        # EOF reached
         if currentChar == "":
+            # EOF reached
             return Token(TokenType.EOF)
-        
-        charIsToken : bool = False
-        for tokenType in TokenType:
-            if(currentChar == str(tokenType)):
-                charIsToken = True
-                return Token(tokenType)
-        
-        if not charIsToken:
-            if currentChar.isdigit():
-                return Token(TokenType.INTEGER_LITERAL, self._scan_integer_literal(currentChar))
-            else:
-                raise KrustySyntaxError(f'Unrecognized token "{currentChar}"')
-    
+        elif [str(x) for x in TokenType].count(currentChar) > 0:
+            return Token(TokenType.from_string(currentChar))
+        elif currentChar.isalpha() or currentChar == "_":
+            # Is identifier or token
+            identifier : str = self._scan_identifier(currentChar)
+            for tokenType in TokenType:
+                if str(tokenType) == identifier:
+                    return Token(tokenType)
+            raise KrustySyntaxError(f"Unrecognized identifier \"{currentChar}\"")
+        elif currentChar.isdigit():
+            # Is integer literal
+            return Token(TokenType.INTEGER_LITERAL, self._scan_integer_literal(currentChar))
+        else:
+            raise KrustySyntaxError(f"Unrecognized token \"{currentChar}\"")
+                    
     def scan_all(self):
         currentChar : str
 

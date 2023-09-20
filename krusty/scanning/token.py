@@ -13,8 +13,19 @@ class TokenType(Enum):
     # Literals
     INTEGER_LITERAL = "integer literal"
 
+    # Keywords
+    PRINT = "print"
+
     # Other
+    SEMNICOLON = ";"
     EOF = "EOF"
+
+    @staticmethod
+    def from_string(string : str) -> "TokenType":
+        for type in TokenType:
+            if str(type) == string:
+                return type
+        return TokenType.UNKNOWN_TOKEN
 
     def __str__(self) -> str:
         return self.value
@@ -39,6 +50,11 @@ class Token:
     def is_operator(self) -> bool:
         if (self.type == TokenType.PLUS or self.type == TokenType.MINUS or
             self.type == TokenType.STAR or self.type == TokenType.SLASH):
+            return True
+        return False
+
+    def is_literal(self) -> bool:
+        if (self.type == TokenType.INTEGER_LITERAL):
             return True
         return False
     

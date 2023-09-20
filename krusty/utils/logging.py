@@ -75,3 +75,9 @@ class KrustySyntaxError(KrustyFatalException):
             message (str): Message to print after error type
         """
         super().__init__("SYNTAX ERROR", message)
+
+class KrustyIdentifierError(KrustyFatalException):
+    return_code = 5
+
+    def __init__(self, message : str):
+        super().__init__("IDENTIFIER ERROR", message)

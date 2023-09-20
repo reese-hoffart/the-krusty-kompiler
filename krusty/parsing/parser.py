@@ -9,8 +9,30 @@ class Parser:
         # Attributes
         self.put_back_buffer : Token = None
 
-    def create_ast(self) -> ASTNode:
-        return self._parse_expr()
+    # def create_ast(self) -> ASTNode:
+    #     return self.parse_statements()
+
+    def parse_statements(self) -> ASTNode:
+        while not self._peek_next_token().matches_types([TokenType.EOF]):
+            astForStatement : ASTNode = self._parse_statement()
+
+            yield astForStatement
+
+    def _parse_statement(self) -> ASTNode:
+        left : ASTNode
+        value : Token
+        
+        if not self._peek_next_token().matches_types([TokenType.PRINT]):
+            raise KrustySyntaxError(f"Expected \"{TokenType.PRINT}\", but got \"{self._peek_next_token()}\"")
+        value = self._consume_next_token()
+        
+        left = self._parse_expr()
+
+        if not self._peek_next_token().matches_types([TokenType.SEMNICOLON]):
+            raise KrustySyntaxError(f"Expected \"{TokenType.SEMNICOLON}\", but got \"{self._peek_next_token()}\"")
+        self._consume_next_token()
+
+        return ASTNode(value, left=left)
         
     def _parse_expr(self) -> ASTNode:
         return self._parse_addExpr()
